@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+/*.plinks path {
+  stroke: #999;
+  /*stroke-opacity: 0.6;
+}
+*/
+
+.nodes circle {
+  stroke: #fff;
+  stroke-width: 1.5px;
+}
+
+
+text {
+  font-family: sans-serif;
+  font-size: 10px;
+}
+
+</style>
+<html>
+
+<p> Search String: </p>
+<p id="searchString"> </p>
+<input type="button" id="useSearchString" value="List datasets related to search string" onclick="useSearchString()">
+<select id="datasetsdropdown" onchange="dropdownChangeOperation()">
+
+</select>
+
+
+
+</html>
+<div id="my_dataviz">
+<svg id="svg1" width="1000" height="600"></svg>
+<svg id="svg2" width="1000" height="1000"></svg>
+</div>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script>
+
+var selectedNodeString = "";
+var svg = d3.select("#svg1"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+var color = d3.scaleOrdinal(d3.schemeCategory20);
+
+var simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; }).distance(300))
+    // .force("charge", d3.forceManyBody())
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+graph = {{data.fdl_data | safe }};
+
+matrix = {{data.corr_data | safe}};
+nodeinput = {{data.node_data | safe}};
+
+
+
+    var plink = svg.append("g")
+      .attr("class", "plinks")
+      .selectAll("path")
+      .data(graph.links)
+      .enter().append("path")
+      .attr("stroke", function(d){
+        if(d.value<0)
+          return 'red'
+        else
+          return 'green'})
+      .attr("stroke-width", function(d) { return Math.abs(d.value)*5; })
+      .attr("fill", "none")
+      .attr("marker-end","url(#arrow)")
+      ;
+
+
+
+  var node = svg.append("g")
+      .attr("class", "nodes")
+    .selectAll("g")
+    .data(graph.nodes)
+    .enter().append("g")
+    
+  var circles = node.append("circle")
+      .attr("r", 7)
+      .attr("fill", function(d) { return color(d.group); })
+      .on("mouseover", function(d) {selectedNodeString = d.id;
+                                    document.getElementById("searchString").innerHTML = selectedNodeString;
+                                      })
+      .call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended));
+
+
+
+  var lables = node.append("text")
+      .text(function(d) {
+        return d.id;
+      })
+      .attr('x', 6)
+      .attr('y', 3);
+
+  node.append("title")
+      .text(function(d) { return d.id; });
+
+  simulation
+      .nodes(graph.nodes)
+      .on("tick", ticked);
+
+  simulation.force("link")
+      .links(graph.links);
+
+  svg.append('marker')
+    .attr('id', 'arrow')
+    .attr('markerUnits', "userSpaceOnUse")
+    //BOX??
+    .attr('viewBox', [0, -5, 10, 10])
+    .attr('refX', "0")
+    .attr('refY', "0")      
+    .attr('markerWidth', 12)
+    .attr('markerHeight', 12)
+    .attr('orient', 'auto')
+    .append('path')
+    // .attr('d', d3.line()(arrowPoints))
+    //MARKER SHAPE
+    .attr('d', "M0,-5L10,0L0,5")
+    // .attr('stroke', 'black');
+
+  function ticked() {
+    // link
+    //     .attr("x1", function(d) { return d.source.x; })
+    //     .attr("y1", function(d) { return d.source.y; })
+    //     .attr("x2", function(d) { return d.target.x+3; })
+    //     .attr("y2", function(d) { return d.target.y+10; });
+    //     // .attr("marker-end","url(#arrow)");
+
+     plink.attr("d", function(d){
+        var dx = d.target.x - d.source.x,
+            dy = d.target.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+        // return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+        return "M" + d.source.x + "," + d.source.y + "L" +  d.target.x + "," + d.target.y;
+      });
+      plink.attr("d", function(d) {
+        var pl = this.getTotalLength(),
+          r = 5 + 16.97, //16.97 is the "size" of the marker Math.sqrt(12**2 + 12 **2)
+          m = this.getPointAtLength(pl - r);
+
+         var dx = m.x - d.source.x,
+            dy = m.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+
+            //STRAIGHT LINE
+          return "M" + d.source.x + "," + d.source.y + "L" +  m.x + "," + m.y;
+      });
+
+    node
+        .attr("transform", function(d) {
+          return "translate(" + d.x + "," + d.y + ")";
+        })
+  }
+
+
+function dragstarted(d) {
+  if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(d) {
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragended(d) {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+function addOption(item)
+{
+  if(item.length > 4)
+  {
+    var dropdown = document.getElementById("datasetsdropdown");
+    var option = document.createElement("option");
+    option.text = item;
+    dropdown.add(option);
+  }
+  
+}
+
+
+function dropdownChangeOperation()
+{
+  var dropdown = document.getElementById("datasetsdropdown");
+  var selectedDataset = dropdown.options[dropdown.selectedIndex].text;
+  $.ajax({
+      type: 'GET',
+      url: "/downloadDataset/" + selectedDataset,
+      contentType: 'application/json; charset=utf-8',
+      success: function(result) {
+            // alert(result);
+               
+      }
+    });
+  // alert(selectedDataset);
+}
+
+function useSearchString()
+{
+
+    $.ajax({
+      type: 'GET',
+      url: "/getDatasetList/" + selectedNodeString,
+      contentType: 'application/json; charset=utf-8',
+      success: function(result) {
+            // alert(result);
+            datasets = result.split('"');
+            datasets.forEach(addOption);    
+      }
+    });
+    // datasets.forEach(addOption);
+    // datasets = {{data.datasets | safe}};
+}
+
+
+//HEATMAP CODE
+var threshold = 0.5
+var topAttributes = new Set();
+for(i = 0; i < matrix.length; i++)
+{
+  for(j = 0; j < matrix.length; j++)
+  {
+    if((Math.abs(matrix[i][j]) > threshold) && (i!=j))
+    {
+      topAttributes.add(nodeinput[i]);
+      topAttributes.add(nodeinput[j]);
+    }
+  }
+}
+
+
+// set the dimensions and margins of the graph
+var margin = {top: 30, right: 30, bottom: 200, left: 200},
+  width = 450 - margin.left - margin.right,
+  height = 450 - margin.top - margin.bottom;
+
+// append the svg object to the body of the page
+var svg = d3.select("#svg2")
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", height + margin.top + margin.bottom)
+.append("g")
+  .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
+
+
+var matrix2 = []
+b =[]
+for (i=0; i< matrix.length; i++){
+  b.push(50);
+}
+
+for (i=0; i< matrix.length; i++){
+  matrix2.push(b);
+}
+
+
+// Build X scales and axis:
+var x = d3.scaleBand()
+  .range([ 0, width ])
+  .domain(nodeinput)
+  .padding(0.01);
+svg.append("g")
+  .attr("transform", "translate(0," + height + ")")
+  .call(d3.axisBottom(x))
+    .selectAll("text")  
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em")
+            .attr("transform", function(d) {
+                return "rotate(-90)" 
+                }
+
+    );
+
+// Build X scales and axis:
+var y = d3.scaleBand()
+  .range([ height, 0 ])
+  .domain(nodeinput.reverse())
+  .padding(0.01);
+svg.append("g")
+  .call(d3.axisLeft(y));
+
+// Build color scale
+var positiveColor = d3.scaleLinear()
+  .range(["white", "#69b3a2"])
+  .domain([1,100])
+
+var negativeColor = d3.scaleLinear()
+  .range(["white", "#d13f26"])
+  .domain([1,100])
+
+var values = topAttributes.values();
+var topString = ""
+ for(i = 0; i < topAttributes.size; i++)
+ {
+    topString = topString + values.next().value
+    if(i != topAttributes.size-1)
+    {
+      topString = topString + ", "
+    }
+ }
+
+svg.append("text")
+         .attr("x", -110)
+         .attr("y", height+ 120)
+         // .style("text-decoration", "underline") 
+         .text("Interesting variables:");
+
+      svg.append("text")
+         .attr("x", -110)
+         .attr("y", height+ 140)
+         // .style("text-decoration", "underline") 
+         .text(topString);
+
+var i;
+var j;
+for(i = 0; i < matrix.length; i++)
+{
+  for(j = 0; j < matrix.length; j++)
+  {
+    svg.selectAll()
+      .data(matrix2, function(d) {return nodeinput[i]+':'+nodeinput[j];})
+      .enter()
+      .append("rect")
+      .attr("x", function(d) { return x(nodeinput[i]) })
+      .attr("y", function(d) { return y(nodeinput[matrix.length-j-1]) })
+      .attr("width", x.bandwidth() )
+      .attr("height", y.bandwidth() )
+      .style("fill", function(d) { 
+        if((matrix[matrix.length-1-i][j]) > 0)
+          return positiveColor((matrix[matrix.length-1-i][j])*100)
+        else if((matrix[matrix.length-1-i][j]) < 0)
+          return negativeColor(Math.abs(matrix[matrix.length-1-i][j])*700)
+
+      } )    
+  }
+}
+</script>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.nodes circle {
+  stroke: #fff;
+  stroke-width: 1.5px;
+}
+
+
+text {
+  font-family: sans-serif;
+  font-size: 10px;
+}
+
+</style>
+<html>
+<head>
+  <h2> <center> The Causal Link Detective Game </center></h2>
+  </head>
+
+<h1>Show Checkboxes</h1>
+
+<form>
+  <input type="checkbox" id="vehicle1" name="vehicle1" value="Bike">
+  <label for="vehicle1"> I have a bike</label><br>
+  <input type="checkbox" id="vehicle2" name="vehicle2" value="Car">
+  <label for="vehicle2"> I have a car</label><br>
+  <input type="checkbox" id="vehicle3" name="vehicle3" value="Boat">
+  <label for="vehicle3"> I have a boat</label><br><br>
+  <input type="submit" value="Submit" onclick="createGraph()">
+</form>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script>
+
+function createGraph()
+{
+  alert("HELLO")
+  $.ajax({
+      type: 'GET',
+      url: "/getSelectedVariablesGraph/" + "hello",
+      contentType: 'application/json; charset=utf-8',
+      success: function(result) {
+               
+      }
+    });
+}
+nodeinput = {{data.node_data | safe}};
+
+</script>

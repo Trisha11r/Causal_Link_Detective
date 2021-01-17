@@ -1,0 +1,4 @@
+// graph = {{data.fdl_data | safe }};
+
+// matrix = {{data.corr_data | safe}};
+// nodeinput = {{data.node_data | safe}};

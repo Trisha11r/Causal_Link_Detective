@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.nodes circle {
+  stroke: #fff;
+  stroke-width: 1.5px;
+}
+
+
+text {
+  font-family: sans-serif;
+  font-size: 10px;
+}
+
+table, th, td {
+  border: 1px solid black;
+}
+
+</style>
+<html>
+<head>
+  <h2> <center> The Causal Link Detective Game </center></h2>
+  </head>
+
+<div id="part1">
+<h1>Select variables for the causal graphs</h1>
+<h1 id="DatasetName"> Dataset: </h1>
+<form id="VariableMenu">
+
+</form>
+
+</div>
+<div id="part2" style="display:none">
+<p> Selected variable: </p>
+<p id="searchString"> </p>
+<input type="button" id="useSearchString" value="List datasets related to selected variable" onclick="useSearchString()">
+<select id="datasetsdropdown" onchange="dropdownChangeOperation()">
+</select>
+
+</html>
+<div id="my_dataviz" width = "1000">
+  <svg id="svg1" width="300" height="300" style="background-color: wheat"></svg>
+  <svg id="svg2" width="300" height="300" style="background-color: wheat"></svg>
+  <svg id="svg3" width="300" height="300" style="background-color: wheat"></svg>
+  <svg id="svg4" width="300" height="300" style="background-color: wheat"></svg>
+<div id="instructions1" style = "position:relative; left:300px; bottom: 300px"> Select a graph to expand it:</div>
+<!-- <div id="instructions2" style = "position:relative; left:1200px; bottom: 200px"> 2</div>  -->
+
+</div>
+
+<svg id="heatmap" width="1000" height="1000"></svg>
+</div>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="https://d3js.org/d3-selection-multi.v1.js"></script>
+<script>
+
+
+graph = {{data.fdl_data | safe }};
+
+matrix = {{data.corr_data | safe}};
+nodeinput = {{data.node_data | safe}};
+node_initial = {{data.node_initial | safe}};
+dataset_name = {{data.dataset_name | safe}};
+checkboxList = new Array();
+GLOBAL_newEdge = ""
+GLOBAL_newEdgeSource = ""
+GLOBAL_newEdgeTarget = ""
+
+GLOBAL_prevBIC = 100000
+GLOBAL_prevCHI2 = 100000
+GLOBAL_prevPVALUE = 100000
+GLOBAL_prevRMSEA = 100000
+
+function dropdownChangeOperation()
+{
+  var dropdown = document.getElementById("datasetsdropdown");
+  var selectedDataset = dropdown.options[dropdown.selectedIndex].text;
+  $.ajax({
+      type: 'GET',
+      url: "/downloadDataset/" + selectedDataset,
+      contentType: 'application/json; charset=utf-8',
+      success: function(result) {
+            // alert(result);
+               
+      }
+    });
+}
+
+var form = document.getElementById("VariableMenu")
+document.getElementById("DatasetName").innerHTML = "Dataset:" + dataset_name;
+for(i = 0; i < node_initial.length; i++)
+{
+  var x = document.createElement("INPUT");
+  x.setAttribute("type", "checkbox");
+  x.setAttribute("id", node_initial[i]);
+  x.setAttribute("name", node_initial[i]);
+  x.setAttribute("value", node_initial[i]);
+  form.append(x);
+  checkboxList.push(x);
+  var x = document.createElement("Label");
+  x.setAttribute("for", node_initial[i]);
+  x.innerHTML = node_initial[i];
+  form.append(x);
+  form.append(document.createElement("BR"));
+}
+
+var x = document.createElement("INPUT");
+x.setAttribute("type", "button");
+x.setAttribute("value", "Submit");
+x.setAttribute("onclick", "GetFirstGraphDetails()");
+form.append(x);
+// <input type="button" value="Submit" onclick="GetFirstGraphDetails()">
+
+
+graphs = {{data.subgraphs_data | safe}};
+
+var selectedNodeString = "";
+var svg1 = d3.select("#svg1"),
+width = +svg1.attr("width"),
+height = +svg1.attr("height"),
+color = d3.scaleOrdinal(d3.schemeCategory10);
+
+function PartTwo()
+{
+
+  graphs = JSON.parse(resultDict['subgraphs_data']);
+  // graph_details = {};
+  new_graphs = [];
+
+  for(i=0 ; i<graphs.length ; i++)
+  {
+  var graph = setNodes_Links(graphs[i]);
+  var id = "svg"+(i+1).toString();
+  new_graphs.push(graph);
+  // graph_details[id] = {};
+  // graph_details[id]["graph"] = graph;
+
+  var s = d3.select("#"+id);
+  createGraph(s, id, graph);
+  if( i==graphs.length-1 )
+    break;
+  } 
+
+  svg1.attr("transform", "translate(" + 50 + "," + (height-250) + ")")
+    .on("mouseover", function(d){
+      d3.select(this)
+          .style("border", "2px solid red");
+    })
+    .on("mouseout", function(d){
+      d3.select(this)
+          .style("border", "1px white");
+    })
+    .on("click", function(d){;
+      selectedGraph(new_graphs[0]);
+    });
+
+
+  var svg2 = d3.select("#svg2");
+  svg2.attr("transform", "translate(" + (width-120) + "," + (height-250) + ")")
+    .on("mouseover", function(d){
+      d3.select(this)
+          .style("border", "2px solid red");
+    })
+    .on("mouseout", function(d){
+      d3.select(this)
+          .style("border", "1px white");
+    })
+    .on("click", function(d){
+      console.log('svg');
+      selectedGraph(new_graphs[1]);
+    });
+
+  var svg3 = d3.select("#svg3");
+  svg3.attr("transform", "translate(" + -560 + "," + (height+100) + ")")
+    .on("mouseover", function(d){
+      d3.select(this)
+          .style("border", "2px solid red");
+    })
+    .on("mouseout", function(d){
+      d3.select(this)
+          .style("border", "1px white");
+    })
+    .on("click", function(d){
+      selectedGraph(new_graphs[2]);
+    });
+
+  var svg4 = d3.select("#svg4");
+  svg4.attr("transform", "translate(" + -430 + "," + (height+100) + ")")
+    .on("mouseover", function(d){
+      d3.select(this)
+          .style("border", "2px solid red");
+    })
+    .on("mouseout", function(d){
+      d3.select(this)
+          .style("border", "1px white");
+    })
+    .on("click", function(d){
+      selectedGraph(new_graphs[3]);
+    });
+
+
+  svg1.append('marker')
+  .attr('id', 'arrow')
+  .attr('markerUnits', "userSpaceOnUse")
+  .attr('viewBox', [0, -5, 10, 10])
+  .attr('refX', "14")
+  .attr('refY', "0")      
+  .attr('markerWidth', 20)
+  .attr('markerHeight', 20)
+  .attr('orient', 'auto')
+  .append('path')
+  //MARKER SHAPE
+  .attr('fill', '#999')
+  .attr('stroke-width', 10)
+  .attr('d', "M0,-5L10,0L0,5")
+
+ 
+}
+
+
+function setNodes_Links(graph){
+  var nodes_dict = {};
+  var nodes = [];
+
+  for(let i=0 ; i<graph.length ; i++)
+  {
+    var s = graph[i].source;
+    var d = graph[i].target;
+
+    if( nodes_dict[s]==null )
+    {
+      nodes_dict[s] = true;
+      nodes.push({id:s, group:1});
+    }
+    if( nodes_dict[d]==null )
+    {
+      nodes_dict[d] = true;
+      nodes.push({id:d, group:1});
+    }
+  }
+
+  var new_graph = {"nodes":nodes, "links":graph};
+  return new_graph;
+}
+
+createHeatMap();
+
+source = null;
+target = null;
+added_node = false;
+edge_clicked = false;
+node_clicked = false;
+add_edge = false;
+selectedNode = null;
+selectedEdge = null;
+count_new_nodes = 1;
+var link, node;
+
+function selectedGraph(graph){
+  d3.select("#my_dataviz").selectAll("*").remove();
+  d3.select("#my_dataviz")
+    .append("svg")
+      .attr("id", "chart")
+      .attr("width", 600)
+      .attr("height", 600)
+      .style("background-color", "wheat")
+      .attr("transform", "translate(50,50)");
+
+    d3.select("#my_dataviz")
+    .append("div")
+      .attr("id", "instructions2")
+      .attr("width", 600)
+      .attr("height", 600)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 600px; font-weight: 700")
+      .text("INSTRUCTIONS:")
+      .attr("transform", "translate(50,50)");
+
+   d3.select("#my_dataviz")
+    .append("div")
+      .attr("id", "instructions2")
+      .attr("width", 600)
+      .attr("height", 600)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 600px")
+      .text("Press 'A' to add a new node")
+      .attr("transform", "translate(50,50)");
+
+  d3.select("#my_dataviz")
+    .append("div")
+      .attr("id", "instructions3")
+      .attr("width", 600)
+      .attr("height", 600)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 600px")
+      .text("Press 'D' to delete the selected edge/component")
+      .attr("transform", "translate(50,50)");
+
+      d3.select("#my_dataviz")
+    .append("div")
+      .attr("id", "instructions4")
+      .attr("width", 600)
+      .attr("height", 600)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 600px")
+      .text("Press 'R' to reverse the selected edge")
+      .attr("transform", "translate(50,50)");
+
+       d3.select("#my_dataviz")
+    .append("div")
+      .attr("id", "instructions5")
+      .attr("width", 600)
+      .attr("height", 600)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 600px")
+      .text("Hold shift and select two nodes to draw an edge between them")
+      .attr("transform", "translate(50,50)");
+
+      d3.select("#my_dataviz")
+    .append("div")
+      .attr("id", "instructions5")
+      .attr("width", 600)
+      .attr("height", 600)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 500px; font-weight: 700")
+      .text("UNUSED VARIABLES:")
+      .attr("transform", "translate(50,50)");
+
+      d3.select("#my_dataviz")
+    .append("div")
+      .attr("id", "unusedVariables")
+      .attr("width", 600)
+      .attr("height", 600)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 500px")
+      .attr("transform", "translate(50,50)");
+
+      
+
+      var table = d3.select("#my_dataviz")
+    .append("table")
+    .attr("id", "resultTable")
+      .attr("width", 600)
+      .attr("height", 200)
+      .attr("white-space", "pre")
+      .attr("style", "position:relative; left:800px; bottom: 400px")
+      .attr("transform", "translate(50,50)");
+
+      d3.select("#resultTable")
+      .append("tr")
+      .attr("id", "tableheaderrow");
+
+
+      d3.select("#tableheaderrow")
+      .append("th")
+      .text("-")
+      .attr("style", "background-color: #add8e6")
+
+      d3.select("#tableheaderrow")
+      .append("th")
+      .text("BIC")
+      .attr("style", "background-color: #add8e6")
+      
+      d3.select("#tableheaderrow")
+      .append("th")
+      .text("Chi-squared test")
+      .attr("style", "background-color: #add8e6")
+
+      d3.select("#tableheaderrow")
+      .append("th")
+      .text("CFI")
+      .attr("style", "background-color: #add8e6")
+
+      d3.select("#tableheaderrow")
+      .append("th")
+      .text("RMSEA")
+      .attr("style", "background-color: #add8e6")
+
+      d3.select("#resultTable")
+      .append("tr")
+      .attr("id", "row1");
+
+      d3.select("#row1")
+      .append("td")
+      .text("Current model")
+      .attr("style", "background-color: #add8e6")
+
+      d3.select("#row1")
+      .append("td")
+      .attr("id", "row1_BIC")
+      .text("-")
+
+      d3.select("#row1")
+      .append("td")
+      .text("-")
+      .attr("id", "row1_CHI2")
+
+      d3.select("#row1")
+      .append("td")
+      .text("-")
+      .attr("id", "row1_PVALUE")
+
+      d3.select("#row1")
+      .append("td")
+      .text("-")
+      .attr("id", "row1_RMSEA")
+
+      d3.select("#resultTable")
+      .append("tr")
+      .attr("id", "row2");
+
+      d3.select("#row2")
+      .append("td")
+      .text("With new edge reversed")
+      .attr("style", "background-color: #add8e6")
+
+      d3.select("#row2")
+      .append("td")
+      .attr("id", "row2_BIC")
+      .text("-")
+
+      d3.select("#row2")
+      .append("td")
+      .text("-")
+      .attr("id", "row2_CHI2")
+
+      d3.select("#row2")
+      .append("td")
+      .text("-")
+      .attr("id", "row2_PVALUE")
+
+      d3.select("#row2")
+      .append("td")
+      .text("-")
+      .attr("id", "row2_RMSEA")
+
+    
+
+      d3.select("#resultTable")
+      .append("tr")
+      .attr("id", "row3");
+
+      d3.select("#row3")
+      .append("td")
+      .text("Without the new edge")
+      .attr("style", "background-color: #add8e6")
+
+      d3.select("#row3")
+      .append("td")
+      .attr("id", "row3_BIC")
+      .text("-")
+
+      d3.select("#row3")
+      .append("td")
+      .text("-")
+      .attr("id", "row3_CHI2")
+
+      d3.select("#row3")
+      .append("td")
+      .text("-")
+      .attr("id", "row3_PVALUE")
+
+      d3.select("#row3")
+      .append("td")
+      .text("-")
+      .attr("id", "row3_RMSEA")
+
+  svg = d3.select("#chart");
+
+  nodes = graph.nodes;
+  links = graph.links;
+  simulation = d3.forceSimulation(nodes)
+    .force("charge", d3.forceManyBody().strength(-100))
+    .force("link", d3.forceLink().id(function(d) { return d.id; }).distance(300))
+    .force("x", d3.forceX())
+    .force("y", d3.forceY())
+    .alphaTarget(1)
+    .on("tick", ticked);
+
+  g = svg.append("g").attr("transform", "translate(" + 300 + "," + 300 + ")");
+  g.append("g").attr("stroke", "#000").attr('class', 'links').attr("stroke-width", 1.5);
+  g.append("g").attr("stroke", "#fff").attr('class', 'nodes').attr("stroke-width", 1.5);
+
+  svg.append('marker')
+    .attr('id', 'arrow')
+    .attr('markerUnits', "userSpaceOnUse")
+    .attr('viewBox', [0, -5, 10, 10])
+    .attr('refX', "14")
+    .attr('refY', "0")      
+    .attr('markerWidth', 20)
+    .attr('markerHeight', 20)
+    .attr('orient', 'auto')
+    .append('path')
+    //MARKER SHAPE
+    .attr('fill', '#999')
+    .attr('stroke-width', 10)
+    .attr('d', "M0,-5L10,0L0,5")
+
+  restart();
+}
+
+function createGraph(svg, id, graph)
+{
+    var nodes = graph.nodes;
+    var links = graph.links;
+    var selectedNode = null;
+    var selectedEdge = null;
+    var node, link;
+
+    var g = svg.append("g").attr("transform", "translate(" + 150 + "," + 150 + ")");
+    g.append("g").attr("stroke", "#000").attr('class', id + 'links').attr("stroke-width", 1.5);
+    g.append("g").attr("stroke", "#fff").attr('class', id + 'nodes').attr("stroke-width", 1.5);
+
+    var simulation = d3.forceSimulation(nodes)
+      .force("charge", d3.forceManyBody().strength(-100))
+      .force("link", d3.forceLink(links).id(function(d) { return d.id; }).distance(250))
+      .force("x", d3.forceX())
+      .force("y", d3.forceY())
+      .alphaTarget(1)
+      .on("tick", function(){
+        // console.log("createGraph");
+        node.attr("transform", function (d) { return "translate(" + d.x + ", " + d.y + ")";});
+
+        link.attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+      });
+
+    localrestart();
+
+    function localrestart(){
+
+      d3.select("." + id + "links").selectAll("*").remove();
+      d3.select("." + id + "nodes").selectAll("*").remove();
+      node = d3.select("." + id + "nodes")
+                .selectAll("." + id + "node")
+                .data(nodes)
+                .enter()
+                .append("g")
+                .attr("class", id + "node")
+                .attr("id", function(d){return id + d.id;})
+                // .merge(node)
+                .on("mouseover", function(d) {selectedNodeString = d.id;
+                                          document.getElementById("searchString").innerHTML = selectedNodeString;
+                                          })
+                .on("click", function(d){
+                  d3.select(this).select("circle").style("fill", "red");
+                    localresetHighlight();
+                    // console.log(d);
+                    selectedNode = d;
+                    // node_clicked = true;
+                    selectedEdge = null;
+                    // edge_clicked = false;
+                })
+                .call(d3.drag()
+                    .on("start", localdragstarted)
+                    .on("drag", localdragged)
+                    .on("end", localdragended));
+
+      node.append("circle")
+          .attr("r", 6)
+          .style("fill", function (d, i) {return color(d.group);})
+
+      node.append("title")
+          .text(function (d) {return d.id;});
+
+      node.append("text")
+          .attr("dy", -6)
+          .attr('stroke', 'black')
+          .attr('stroke-width', 0.1)
+          .text(function (d) {return d.id;});
+
+      link = d3.select("." + id + "links")
+              .selectAll("." + id + "link")
+              .data(links)
+              .enter()
+              .append("line")
+              .attr("class", id + "link")
+              .attr("id", function(d){ return (id + d.source + d.target);})
+              .attr('marker-end','url(#arrow)')
+              .attr('stroke', 'green')
+              .attr('stroke-opacity', 0.6)
+              .attr("stroke-width", function(d) { return Math.abs(d.value)*10; })
+              // .merge(link)
+              .on("click", function(d){
+                // console.log(d);
+                localresetHighlight();
+                d3.select(this).attr("stroke", "red");
+                selectedNode = null;
+                // node_clicked = false;
+                selectedEdge = d;
+                // edge_clicked = true;
+              });
+
+      // Update and restart the simulation.
+      simulation.nodes(nodes);
+      simulation.force("link").links(links);
+      simulation.alpha(1).restart();
+    }
+
+    function localdragstarted(d) {
+      if (!d3.event.active) simulation.alphaTarget(0.7).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function localdragged(d) {
+      d.fx = d3.event.x;
+      d.fy = d3.event.y;
+    }
+
+    function localdragended(d) {
+      if (!d3.event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    function localresetHighlight(){
+      if( selectedNode!=null )
+        d3.select("#" + id + selectedNode.id).select("circle").style("fill", color(selectedNode.group));
+      if( selectedEdge!=null )
+        d3.select("#" + id + selectedEdge.source.id + selectedEdge.target.id).attr("stroke", "green");
+    }
+
+}
+
+function restart() {
+
+  // Apply the general update pattern to the nodes.
+  d3.select(".links").selectAll("*").remove();
+  d3.select(".nodes").selectAll("*").remove();
+  node = d3.select(".nodes")
+            .selectAll(".node")
+            .data(nodes)
+            .enter()
+            .append("g")
+            .attr("class", "node")
+            .attr("id", function(d){return d.id;})
+            .on("mouseover", function(d) {selectedNodeString = d.id;
+                                      document.getElementById("searchString").innerHTML = selectedNodeString;
+                                      })
+            .on("click", function(d){
+              d3.select(this).select("circle").style("fill", "red");
+              if( add_edge==true )
+              {
+                console.log('add_edge');
+                if( source==null && selectedNode==null )
+                {
+                  source = d;
+                  console.log("source: ");
+                  console.log(source);
+                }
+                else if( target==null )
+                {
+                  if( selectedNode!=null )
+                    source = selectedNode;
+                  target = d;
+                  console.log("target: ");
+                  console.log(target);
+                  addEdge(source, target);
+                  source = null;
+                  target = null;
+                }
+                add_edge = false;
+              }
+              else
+              {
+                resetHighlight();
+                console.log(d);
+                selectedNode = d;
+                node_clicked = true;
+                selectedEdge = null;
+                edge_clicked = false;
+              }
+            })
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+            // .merge(node);
+
+  node.append("circle")
+      .attr("r", 6)
+      .style("fill", function (d, i) {return color(d.group);})
+
+  node.append("title")
+      .text(function (d) {return d.id;});
+
+  node.append("text")
+      .attr("dy", -6)
+      .attr('stroke', 'black')
+      .attr('stroke-width', 0.1)
+      .text(function (d) {return d.id;});
+  
+  node.exit().remove();
+
+  link = d3.select(".links")
+          .selectAll(".link")
+          .data(links)
+          .enter()
+          .append("line")
+          .attr("class", "link")
+          .attr("id", function(d){return (d.source.id + d.target.id);})
+          .attr('marker-end','url(#arrow)')
+          .attr('stroke', 'green')
+          .attr('stroke-opacity', 0.6)
+          .attr("stroke-width", function(d) { return Math.abs(d.value)*10; })
+          // .merge(link)
+          .on("click", function(d){
+            console.log(d);
+            resetHighlight();
+            d3.select(this).attr("stroke", "red");
+            selectedNode = null;
+            node_clicked = false;
+            selectedEdge = d;
+            edge_clicked = true;
+          });
+  link.exit().remove();
+  // Update and restart the simulation.
+  simulation.nodes(nodes);
+  simulation.force("link").links(links);
+  simulation.alpha(1).restart();
+  UpdateUnusedVariables();
+}
+
+function UpdateUnusedVariables()
+{
+  var temp = document.getElementById('unusedVariables');
+  temp.innerHTML = "";
+  var UsedVariables = [];
+  for(i = 0; i < nodes.length; i++)
+  {
+    UsedVariables.push(nodes[i].id);
+  }
+
+  for(i = 0; i < node_initial.length; i++)
+  {
+    if(!UsedVariables.includes(node_initial[i]))
+    {
+      AddUnusedVariableButton(node_initial[i]);
+    }
+  }
+}
+
+function AddUnusedVariableButton(variableName)
+{
+  var temp = document.getElementById('unusedVariables');
+  var button = document.createElement("INPUT");
+  button.setAttribute("type", "button");
+  button.setAttribute("id", variableName);
+  button.setAttribute("name", variableName);
+  button.setAttribute("value", variableName);
+  button.setAttribute("onclick", "AddUnusedVariableToGraph(this)");
+  temp.append(button);
+  temp.append(document.createElement("BR"));
+}
+
+function AddUnusedVariableToGraph(element)
+{
+  // alert(element.id);
+  addNode(element.id);
+  UpdateUnusedVariables();
+}
+d3.select("body")
+    .on("keydown", function()
+    {
+      // console.log(d3.event.key);
+      if(d3.event.key == 'd')
+        remove();
+      else if(d3.event.key == 'r')
+        reverseEdge();
+      else if(d3.event.key == 'a')
+        addNode();
+      else if( d3.event.shiftKey )
+      {
+        add_edge = true;
+        console.log(add_edge);
+      }
+    })
+
+
+function resetHighlight(){
+  if( selectedNode!=null )
+    d3.select("#" + selectedNode.id).select("circle").style("fill", color(selectedNode.group));
+  if( selectedEdge!=null )
+    d3.select("#" + selectedEdge.source.id + selectedEdge.target.id).attr("stroke", "green");
+}
+
+function addNode(){
+
+  simulation.stop();
+  added_node = true;
+  var newNode = {id: 'new_node' + count_new_nodes.toString(), group: 1}
+  nodes = nodes.concat(newNode);
+  count_new_nodes++;
+  restart();
+}
+
+function addNode(nodeName){
+
+  simulation.stop();
+  added_node = true;
+  var newNode = {id: nodeName, group: 1}
+  nodes = nodes.concat(newNode);
+  restart();
+}
+
+function remove(){
+  // console.log('remove');
+  // console.log(selectedNode);
+  if( selectedNode!=null )
+    removeNode();
+  else if( selectedEdge!=null )
+    removeEdge();
+}
+
+function removeEdge(){
+  for(i=0 ; i<links.length ; i++)
+  {
+    var x = links[i];
+    if((x.source.id == selectedEdge.source.id && x.target.id == selectedEdge.target.id))
+    {
+      links.splice(i, 1);
+      break;   
+    }
+  }
+  selectedEdge = null;
+  edge_clicked = false;
+  GetSemopyRemoveEdgeFeedback();
+  restart();
+}
+
+function removeNode(){
+  // console.log(selectedNode);
+  // Removing the node from 'nodes'
+  for(i = 0; i < nodes.length; i++)
+  {
+      if(nodes[i].id == selectedNode.id)
+      {
+        // console.log(nodes[i].id);
+        nodes.splice(i, 1);
+        break;
+      }
+  }
+
+  // Identifying the edge IDs to be removed from 'links'
+  edgesToBeRemoved = [];
+  for(i = 0; i < links.length; i++)
+  {
+    if(links[i].source.id == selectedNode.id || links[i].target.id == selectedNode.id)
+    {
+      edgesToBeRemoved.push(i);
+    }
+  }
+
+  // Removing the identified edges from right to left (otherwise splice function would remove wrong edges)
+  for(i = edgesToBeRemoved.length-1; i >= 0; i--)
+  {
+    links.splice(edgesToBeRemoved[i], 1);
+  }
+
+  node_clicked = false;
+  selectedNode = null;
+  //Resetting the source variable so that when the user clicks on the next node, there is no edge creation.
+  source = null;
+  restart();
+}
+
+function reverseEdge(){
+  for(i = 0; i < links.length; i++)
+  {
+    var x = links[i];
+    if((x.source.id == selectedEdge.source.id && x.target.id == selectedEdge.target.id))
+    {
+      var temp = links[i].source;
+      links[i].source = links[i].target;
+      links[i].target = temp;
+
+      GLOBAL_newEdgeSource = links[i].source.id
+      GLOBAL_newEdgeTarget = links[i].target.id
+
+      restart();
+      break;
+    }
+  }
+  GetSemopyAddEdgeFeedback();
+}
+
+function addEdge(source, target){
+
+  
+  // var old_color = d3.select("#" + source.id).select("circle").style("fill");
+  var newEdge = {"source": source, "target": target, "value":0.5}
+  GLOBAL_newEdge = source.id + "-" + target.id
+  GLOBAL_newEdgeSource = source.id
+  GLOBAL_newEdgeTarget = target.id
+  links = links.concat(newEdge);
+  console.log(links);
+  // d3.select("#" + source.id).select("circle").style("fill", old_color);
+  // d3.select("#" + target.id).select("circle").style("fill", old_color);
+  add_edge = false;
+  GetSemopyAddEdgeFeedback();
+  restart();
+}
+
+function ticked() {
+  node.attr("transform", function (d) {return "translate(" + d.x + ", " + d.y + ")";})
+
+  link.attr("x1", function(d) { return d.source.x; })
+    .attr("y1", function(d) { return d.source.y; })
+    .attr("x2", function(d) { return d.target.x; })
+    .attr("y2", function(d) { return d.target.y; })
+}
+
+function dragstarted(d) {
+  if (!d3.event.active) simulation.alphaTarget(0.8).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(d) {
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragended(d) {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+function createHeatMap(){
+
+  //HEATMAP CODE
+  var threshold = 0.5
+  var topAttributes = new Set();
+  for(i = 0; i < matrix.length; i++)
+  {
+    for(j = 0; j < matrix.length; j++)
+    {
+      if((Math.abs(matrix[i][j]) > threshold) && (i!=j))
+      {
+        topAttributes.add(nodeinput[i]);
+        topAttributes.add(nodeinput[j]);
+      }
+    }
+  }
+
+
+  // set the dimensions and margins of the graph
+  var margin = {top: 30, right: 30, bottom: 200, left: 200},
+    width = 450 - margin.left - margin.right,
+    height = 750 - margin.top - margin.bottom;
+
+  // append the svg object to the body of the page
+  var svg = d3.select("#heatmap")
+    .attr("width", width + 1000 + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .attr("transform",
+          "translate(900," + (margin.top-200) + ")")
+  .append("g")
+    .attr("transform",
+          "translate(" + (margin.left+100) + "," + margin.top + ")");
+
+  var plotWidth = 300,
+      plotHeight = 300;
+
+  var matrix2 = []
+  b =[]
+  for (i=0; i< matrix.length; i++){
+    b.push(50);
+  }
+
+  for (i=0; i< matrix.length; i++){
+    matrix2.push(b);
+  }
+
+
+  // Build X scales and axis:
+  var x = d3.scaleBand()
+    .range([ 0, plotWidth ])
+    .domain(nodeinput)
+    .padding(0.01);
+  svg.append("g")
+    .attr("transform", "translate(0," + plotHeight + ")")
+    .call(d3.axisBottom(x))
+      .selectAll("text")  
+              .style("text-anchor", "end")
+              .attr("dx", "-.8em")
+              .attr("dy", ".15em")
+              .attr("transform", function(d) {
+                  return "rotate(-90)" 
+                  }
+
+      );
+
+  // Build X scales and axis:
+  var y = d3.scaleBand()
+    .range([ plotWidth, 0 ])
+    .domain(nodeinput.reverse())
+    .padding(0.01);
+  svg.append("g")
+    .call(d3.axisLeft(y));
+
+  // Build color scale
+  var positiveColor = d3.scaleLinear()
+    .range(["white", "#69b3a2"])
+    .domain([1,100])
+
+  var negativeColor = d3.scaleLinear()
+    .range(["white", "#d13f26"])
+    .domain([1,100])
+
+  var values = topAttributes.values();
+  var topString = ""
+   for(i = 0; i < topAttributes.size; i++)
+   {
+      topString = topString + values.next().value
+      if(i != topAttributes.size-1)
+      {
+        topString = topString + ", "
+      }
+   }
+
+  svg.append("text")
+     .attr("x", -110)
+     .attr("y", plotHeight+120)
+     // .style("text-decoration", "underline") 
+     .text("Interesting variables:");
+
+  svg.append("text")
+     .attr("x", -110)
+     .attr("y", plotHeight+140)
+     // .style("text-decoration", "underline") 
+     .text(topString);
+
+  var i;
+  var j;
+  for(i = 0; i < matrix.length; i++)
+  {
+    for(j = 0; j < matrix.length; j++)
+    {
+      svg.selectAll()
+        .data(matrix2, function(d) {return nodeinput[i]+':'+nodeinput[j];})
+        .enter()
+        .append("rect")
+        .attr("x", function(d) { return x(nodeinput[i]) })
+        .attr("y", function(d) { return y(nodeinput[matrix.length-j-1]) })
+        .attr("width", x.bandwidth() )
+        .attr("height", y.bandwidth() )
+        .style("fill", function(d) { 
+          if((matrix[matrix.length-1-i][j]) > 0)
+            return positiveColor((matrix[matrix.length-1-i][j])*100)
+          else if((matrix[matrix.length-1-i][j]) < 0)
+            return negativeColor(Math.abs(matrix[matrix.length-1-i][j])*700)
+        } )    
+    }
+  }
+}
+
+
+
+function GetFirstGraphDetails()
+{
+  resultDict = 0;
+  APIString = "";
+  for(i = 0; i < checkboxList.length; i++)
+  {
+    if(checkboxList[i].checked)
+    {
+        APIString = APIString + checkboxList[i].name;
+        APIString = APIString + ",";
+    }
+  }
+  APIString = APIString.substring(0, APIString.length - 1);
+  $.ajax({
+      type: 'GET',
+      url: "/getSelectedVariablesGraph/" + APIString,
+      contentType: 'application/json; charset=utf-8',
+      async: false,
+      success: function(result) {
+          resultDict = JSON.parse(result);       
+      }
+    });
+  var x = document.getElementById("part1");
+  var y = document.getElementById("part2");
+  x.style.display = "none";
+  y.style.display = "block";
+  PartTwo();
+}
+
+function GetSemopyRemoveEdgeFeedback()
+{
+  APIString = ""
+  for(i = 0; i < links.length; i++)
+  {
+    APIString = APIString + links[i].source.id + "-" + links[i].target.id
+    APIString = APIString + ","
+  }
+  APIString = APIString.substring(0, APIString.length - 1);
+  // alert(APIString)
+  $.ajax({
+      type: 'GET',
+      url: "/getSemopyEdgeFeedback/" + APIString,
+      contentType: 'application/json; charset=utf-8',
+      async: false,
+      success: function(result) {
+          resultSemopy1 = JSON.parse(result);       
+      }
+    });
+
+  curColor = ""
+  if(resultSemopy1["BIC"] < GLOBAL_prevBIC)
+    curColor = "green";
+  else if(resultSemopy1["BIC"] > GLOBAL_prevBIC)
+    curColor = "red";
+  else
+    curColor = "black";
+  document.getElementById("row1_BIC").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["BIC"] + "</span>";
+
+
+  if(resultSemopy1["CHI2"] < GLOBAL_prevCHI2)
+    curColor = "green";
+  else if(resultSemopy1["CHI2"] > GLOBAL_prevCHI2)
+    curColor = "red";
+  else
+    curColor = "black";
+  document.getElementById("row1_CHI2").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["CHI2"] + "</span>";
+
+  if(resultSemopy1["PVALUE"] > GLOBAL_prevPVALUE)
+    curColor = "green";
+  else if(resultSemopy1["PVALUE"] < GLOBAL_prevPVALUE)
+    curColor = "red";
+  else
+    curColor = "black";
+
+  document.getElementById("row1_PVALUE").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["PVALUE"] + "</span>";
+
+  if(resultSemopy1["RMSEA"] < GLOBAL_prevRMSEA)
+    curColor = "green";
+  else if(resultSemopy1["RMSEA"] > GLOBAL_prevRMSEA)
+    curColor = "red";
+  else
+    curColor = "black";
+  document.getElementById("row1_RMSEA").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["RMSEA"] + "</span>";
+
+  GLOBAL_prevRMSEA = resultSemopy1["RMSEA"];
+  GLOBAL_prevPVALUE = resultSemopy1["PVALUE"];
+  GLOBAL_prevBIC = resultSemopy1["BIC"];
+  GLOBAL_prevCHI2 = resultSemopy1["CHI2"];
+}
+function GetSemopyAddEdgeFeedback()
+{
+  // 1. With edge
+  APIString = ""
+  for(i = 0; i < links.length; i++)
+  {
+    APIString = APIString + links[i].source.id + "-" + links[i].target.id
+    APIString = APIString + ","
+  }
+  APIString = APIString.substring(0, APIString.length - 1);
+  // alert(APIString)
+  $.ajax({
+      type: 'GET',
+      url: "/getSemopyEdgeFeedback/" + APIString,
+      contentType: 'application/json; charset=utf-8',
+      async: false,
+      success: function(result) {
+          resultSemopy1 = JSON.parse(result);       
+      }
+    });
+
+  curColor = ""
+  if(resultSemopy1["BIC"] < GLOBAL_prevBIC)
+    curColor = "green";
+  else if(resultSemopy1["BIC"] > GLOBAL_prevBIC)
+    curColor = "red";
+  else
+    curColor = "black";
+  document.getElementById("row1_BIC").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["BIC"] + "</span>";
+
+
+  if(resultSemopy1["CHI2"] < GLOBAL_prevCHI2)
+    curColor = "green";
+  else if(resultSemopy1["CHI2"] > GLOBAL_prevCHI2)
+    curColor = "red";
+  else
+    curColor = "black";
+  document.getElementById("row1_CHI2").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["CHI2"] + "</span>";
+
+  if(resultSemopy1["PVALUE"] > GLOBAL_prevPVALUE)
+    curColor = "green";
+  else if(resultSemopy1["PVALUE"] < GLOBAL_prevPVALUE)
+    curColor = "red";
+  else
+    curColor = "black";
+
+  document.getElementById("row1_PVALUE").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["PVALUE"] + "</span>";
+
+  if(resultSemopy1["RMSEA"] < GLOBAL_prevRMSEA)
+    curColor = "green";
+  else if(resultSemopy1["RMSEA"] > GLOBAL_prevRMSEA)
+    curColor = "red";
+  else
+    curColor = "black";
+  document.getElementById("row1_RMSEA").innerHTML = "<span style='color: " + curColor + ";'>" + resultSemopy1["RMSEA"] + "</span>";
+
+  GLOBAL_prevRMSEA = resultSemopy1["RMSEA"];
+  GLOBAL_prevPVALUE = resultSemopy1["PVALUE"];
+  GLOBAL_prevBIC = resultSemopy1["BIC"];
+  GLOBAL_prevCHI2 = resultSemopy1["CHI2"];
+
+  // 2. With edge reversed
+  APIString = ""
+  for(i = 0; i < links.length; i++)
+  {
+    if((links[i].source.id == GLOBAL_newEdgeSource) && (links[i].target.id == GLOBAL_newEdgeTarget))
+    {
+        APIString = APIString + links[i].target.id + "-" + links[i].source.id
+    }
+    else
+    {
+      APIString = APIString + links[i].source.id + "-" + links[i].target.id
+    }
+    APIString = APIString + ","
+  }
+  APIString = APIString.substring(0, APIString.length - 1);
+  // alert(APIString)
+  $.ajax({
+      type: 'GET',
+      url: "/getSemopyEdgeFeedback/" + APIString,
+      contentType: 'application/json; charset=utf-8',
+      async: false,
+      success: function(result) {
+          resultSemopy2 = JSON.parse(result);       
+      }
+    });
+
+  document.getElementById("row2_BIC").innerHTML = resultSemopy2["BIC"]
+  document.getElementById("row2_CHI2").innerHTML = resultSemopy2["CHI2"]
+  document.getElementById("row2_PVALUE").innerHTML = resultSemopy2["PVALUE"]
+  document.getElementById("row2_RMSEA").innerHTML = resultSemopy2["RMSEA"]
+
+  // 3. Without edge
+  APIString = ""
+  for(i = 0; i < links.length; i++)
+  {
+    if((links[i].source.id == GLOBAL_newEdgeSource) && (links[i].target.id == GLOBAL_newEdgeTarget))
+    {
+        temp = -1
+    }
+    else
+    {
+      APIString = APIString + links[i].source.id + "-" + links[i].target.id
+      APIString = APIString + ","
+    }
+  }
+  APIString = APIString.substring(0, APIString.length - 1);
+  // alert(APIString)
+  $.ajax({
+      type: 'GET',
+      url: "/getSemopyEdgeFeedback/" + APIString,
+      contentType: 'application/json; charset=utf-8',
+      async: false,
+      success: function(result) {
+          resultSemopy3 = JSON.parse(result);       
+      }
+    });
+
+  document.getElementById("row3_BIC").innerHTML = resultSemopy3["BIC"]
+  document.getElementById("row3_CHI2").innerHTML = resultSemopy3["CHI2"]
+  document.getElementById("row3_PVALUE").innerHTML = resultSemopy3["PVALUE"]
+  document.getElementById("row3_RMSEA").innerHTML = resultSemopy3["RMSEA"]
+}
+
+function useSearchString()
+{
+
+    $.ajax({
+      type: 'GET',
+      url: "/getDatasetList/" + selectedNodeString,
+      contentType: 'application/json; charset=utf-8',
+      success: function(result) {
+            // alert(result);
+            datasets = result.split('"');
+            datasets.forEach(addOption);    
+      }
+    });
+
+function addOption(item)
+{
+  if(item.length > 4)
+  {
+    var dropdown = document.getElementById("datasetsdropdown");
+    var option = document.createElement("option");
+    option.text = item;
+    dropdown.add(option);
+  }
+}
+
+
+
+}
+
+</script>

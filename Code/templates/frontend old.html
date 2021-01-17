@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+/*.plinks path {
+  stroke: #999;
+  /*stroke-opacity: 0.6;
+}
+*/
+
+.nodes circle {
+  stroke: #fff;
+  stroke-width: 1.5px;
+}
+
+
+text {
+  font-family: sans-serif;
+  font-size: 10px;
+}
+
+</style>
+<html>
+
+<p> Search String: </p>
+<p id="searchString"> </p>
+<input type="button" id="useSearchString" value="List datasets related to search string" onclick="useSearchString()">
+<input type="button" id="addNode" value="Add Node" onclick="addNode()">
+<input type="button" id="addNode" value="Reverse Edge" onclick="toggleReverseEdge()">
+<select id="datasetsdropdown" onchange="dropdownChangeOperation()">
+
+</select>
+
+
+
+</html>
+<div id="my_dataviz">
+<svg id="svg1" width="1000" height="600"></svg>
+<svg id="svg2" width="1000" height="1000"></svg>
+</div>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script>
+
+var selectedNodeString = "";
+var svg = d3.select("#svg1"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+var GLOBAL_newNode = null;
+var GLOBAL_newNodePartner = null;
+var GLOBAL_IsNewAddition = false;
+var GLOBAL_IsReverseEdge = false;
+
+var color = d3.scaleOrdinal(d3.schemeCategory20);
+
+var simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; }).distance(200))
+    // .force("charge", d3.forceManyBody())
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+graph = {{data.fdl_data | safe }};
+matrix = {{data.corr_data | safe}};
+nodeinput = {{data.node_data | safe}};
+
+
+
+// graph = {"nodes":[{"id":"Smoking","group":1,"index":0,"x":475.15299970957074,"y":208.48170019785505,"vy":-4.2762001112875604e-8,"vx":-1.3729454782451055e-8},{"id":"Yellow_Fingers","group":1,"index":1,"x":495.4400881167869,"y":308.86675299573494,"vy":0,"vx":0},{"id":"Anxiety","group":1,"index":2,"x":504.0501633535203,"y":288.0238640887761,"vy":0,"vx":0},{"id":"Peer_Pressure","group":1,"index":3,"x":513.352247102717,"y":315.8574182747402,"vy":0,"vx":0},{"id":"Genetics","group":1,"index":4,"x":440.20226538074627,"y":223.50310996853645,"vy":-3.469576003099973e-8,"vx":-1.9007050811424177e-8},{"id":"Attention_Disorder","group":1,"index":5,"x":610.8052552671084,"y":321.45032539759796,"vy":1.4287103983497314e-8,"vx":3.9407009955581916e-8},{"id":"Born_an_Even_Day","group":1,"index":6,"x":496.4547960771846,"y":325.7669417444653,"vy":0,"vx":0},{"id":"Car_Accident","group":1,"index":7,"x":422.7812340075586,"y":253.28177507272827,"vy":3.6754597023453774e-8,"vx":2.313323738979614e-8},{"id":"Fatigue","group":1,"index":8,"x":562.461617043565,"y":396.42315172277335,"vy":4.581324332744512e-8,"vx":-2.8322786183628345e-8},{"id":"Allergy","group":1,"index":9,"x":412.48699130484613,"y":360.4470244068133,"vy":7.830221886456555e-9,"vx":-5.724292978057032e-9},{"id":"Coughing","group":1,"index":10,"x":530.5199779070748,"y":198.99049543833652,"vy":5.878678013407933e-9,"vx":-5.795889559129552e-9},{"id":"Lung_cancer","group":1,"index":11,"x":536.2923647282224,"y":398.9074406822713,"vy":-4.247709315603338e-8,"vx":8.940184960467811e-9}],"links":[{"source":{"id":"Smoking","group":1,"index":0,"x":475.15299970957074,"y":208.48170019785505,"vy":-4.2762001112875604e-8,"vx":-1.3729454782451055e-8},"target":{"id":"Lung_cancer","group":1,"index":11,"x":536.2923647282224,"y":398.9074406822713,"vy":-4.247709315603338e-8,"vx":8.940184960467811e-9},"value":0.4914480122539751,"index":0},{"source":{"id":"Genetics","group":1,"index":4,"x":440.20226538074627,"y":223.50310996853645,"vy":-3.469576003099973e-8,"vx":-1.9007050811424177e-8},"target":{"id":"Lung_cancer","group":1,"index":11,"x":536.2923647282224,"y":398.9074406822713,"vy":-4.247709315603338e-8,"vx":8.940184960467811e-9},"value":0.22761732943856877,"index":1},{"source":{"id":"Attention_Disorder","group":1,"index":5,"x":610.8052552671084,"y":321.45032539759796,"vy":1.4287103983497314e-8,"vx":3.9407009955581916e-8},"target":{"id":"Car_Accident","group":1,"index":7,"x":422.7812340075586,"y":253.28177507272827,"vy":3.6754597023453774e-8,"vx":2.313323738979614e-8},"value":0.30275971612221264,"index":2},{"source":{"id":"Fatigue","group":1,"index":8,"x":562.461617043565,"y":396.42315172277335,"vy":4.581324332744512e-8,"vx":-2.8322786183628345e-8},"target":{"id":"Car_Accident","group":1,"index":7,"x":422.7812340075586,"y":253.28177507272827,"vy":3.6754597023453774e-8,"vx":2.313323738979614e-8},"value":0.46262729973255834,"index":3},{"source":{"id":"Allergy","group":1,"index":9,"x":412.48699130484613,"y":360.4470244068133,"vy":7.830221886456555e-9,"vx":-5.724292978057032e-9},"target":{"id":"Coughing","group":1,"index":10,"x":530.5199779070748,"y":198.99049543833652,"vy":5.878678013407933e-9,"vx":-5.795889559129552e-9},"value":0.3068874541428945,"index":4},{"source":{"id":"Coughing","group":1,"index":10,"x":530.5199779070748,"y":198.99049543833652,"vy":5.878678013407933e-9,"vx":-5.795889559129552e-9},"target":{"id":"Fatigue","group":1,"index":8,"x":562.461617043565,"y":396.42315172277335,"vy":4.581324332744512e-8,"vx":-2.8322786183628345e-8},"value":0.45984681575295894,"index":5},{"source":{"id":"Lung_cancer","group":1,"index":11,"x":536.2923647282224,"y":398.9074406822713,"vy":-4.247709315603338e-8,"vx":8.940184960467811e-9},"target":{"id":"Coughing","group":1,"index":10,"x":530.5199779070748,"y":198.99049543833652,"vy":5.878678013407933e-9,"vx":-5.795889559129552e-9},"value":0.5166996037899898,"index":6}]}
+
+matrix = [[1,0.7747261297564167,0.4010969283093984,0.14913796705115046,0.010207568006910011,0.004058737367915115,-0.022475777160170147,0.05148085044875423,0.16267147551882416,0.03608450354755074,0.26242445728866926,0.4914480122539751],[0.7747261297564167,1,0.3083425286002899,0.11464455676109785,-0.004117381703619812,0.006761754194212817,-0.006245210378165687,0.04932514467324952,0.12469000516413511,0.04731574945097089,0.2073249930700566,0.37706145452380996],[0.4010969283093984,0.3083425286002899,1,0.002989453452563012,0.0062504008198352315,-0.014787314536411066,-0.037838585872668924,0.03077973476367958,0.05092441852861717,0.018498336521944818,0.13721076008007652,0.189933042150523],[0.14913796705115046,0.11464455676109785,0.002989453452563012,1,0.020455044211106208,0.01518635729623501,-0.00702054941751327,0.024010683832487896,0.027850148359054677,-0.005039663178965415,0.04962640524954354,0.056958616766739856],[0.010207568006910011,-0.004117381703619812,0.0062504008198352315,0.020455044211106208,1,0.2686702067822731,-0.02185535200626559,0.14602715402563413,0.09957280148903436,-0.0081989580594855,0.13724541226365705,0.22761732943856877],[0.004058737367915115,0.006761754194212817,-0.014787314536411066,0.01518635729623501,0.2686702067822731,1,-0.020815052627702228,0.30275971612221264,0.03312790859269403,0.019750253337053353,0.054127080357061826,0.06832489878303977],[-0.022475777160170147,-0.006245210378165687,-0.037838585872668924,-0.00702054941751327,-0.02185535200626559,-0.020815052627702228,1,-0.03088165077656745,-0.028450673090657085,-0.033284394162785634,-0.02792845210024826,-0.011934301784723293],[0.05148085044875423,0.04932514467324952,0.03077973476367958,0.024010683832487896,0.14602715402563413,0.30275971612221264,-0.03088165077656745,1,0.46262729973255834,0.03770925511903735,0.20508584902184365,0.16876773874152423],[0.16267147551882416,0.12469000516413511,0.05092441852861717,0.027850148359054677,0.09957280148903436,0.03312790859269403,-0.028450673090657085,0.46262729973255834,1,0.09430250440799581,0.45984681575295894,0.36865274732391495],[0.03608450354755074,0.04731574945097089,0.018498336521944818,-0.005039663178965415,-0.0081989580594855,0.019750253337053353,-0.033284394162785634,0.03770925511903735,0.09430250440799581,1,0.3068874541428945,-0.025726692039304496],[0.26242445728866926,0.2073249930700566,0.13721076008007652,0.04962640524954354,0.13724541226365705,0.054127080357061826,-0.02792845210024826,0.20508584902184365,0.45984681575295894,0.3068874541428945,1,0.5166996037899898],[0.4914480122539751,0.37706145452380996,0.189933042150523,0.056958616766739856,0.22761732943856877,0.06832489878303977,-0.011934301784723293,0.16876773874152423,0.36865274732391495,-0.025726692039304496,0.5166996037899898,1]];
+
+nodeinput = ["Lung_cancer","Coughing","Allergy","Fatigue","Car_Accident","Born_an_Even_Day","Attention_Disorder","Genetics","Peer_Pressure","Anxiety","Yellow_Fingers","Smoking"];
+
+
+
+
+
+    var plink = svg.append("g")
+      .attr("class", "plinks")
+      .selectAll("path")
+      .data(graph.links)
+      .enter().append("path")
+      .attr("stroke", function(d){
+        if(d.value<0)
+          return 'red'
+        else
+          return 'green'})
+      .attr("stroke-width", function(d) { return Math.abs(d.value)*5; })
+      .attr("fill", "none")
+      .attr("marker-end","url(#arrow)")
+      ;
+
+
+
+  var node = svg.append("g")
+      .attr("class", "nodes")
+    .selectAll("g")
+    .data(graph.nodes)
+    .enter().append("g")
+    
+  var circles = node.append("circle")
+      .attr("r", 7)
+      .attr("fill", function(d) { return color(d.group); })
+      .on("mouseover", function(d) {selectedNodeString = d.id;
+                                    document.getElementById("searchString").innerHTML = selectedNodeString;
+                                      })
+      .call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended));
+
+
+
+  var lables = node.append("text")
+      .text(function(d) {
+        return d.id;
+      })
+      .attr('x', 6)
+      .attr('y', 3);
+
+  node.append("title")
+      .text(function(d) { return d.id; });
+
+  simulation
+      .nodes(graph.nodes)
+      .on("tick", ticked);
+
+  simulation.force("link")
+      .links(graph.links);
+
+  svg.append('marker')
+    .attr('id', 'arrow')
+    .attr('markerUnits', "userSpaceOnUse")
+    //BOX??
+    .attr('viewBox', [0, -5, 10, 10])
+    .attr('refX', "0")
+    .attr('refY', "0")      
+    .attr('markerWidth', 12)
+    .attr('markerHeight', 12)
+    .attr('orient', 'auto')
+    .append('path')
+    // .attr('d', d3.line()(arrowPoints))
+    //MARKER SHAPE
+    .attr('d', "M0,-5L10,0L0,5")
+    .attr('stroke', 'black');
+
+    var color = d3.scaleOrdinal(d3.schemeCategory20);
+
+  function updateGraph(){
+
+    d3.select("#svg1").selectAll("*").remove();
+  
+  var svg = d3.select("#svg1"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+  // console.log(svg);
+
+  var plink = svg.append("g")
+      .attr("class", "plinks")
+      .selectAll("path")
+      .data(simulation.force("link")
+      .links())
+      .enter().append("path")
+      .attr("source", function(d)
+        {
+          return d.source.id
+        })
+      .attr("target", function(d)
+      {
+        return d.target.id
+      })
+      .on("click", function(d) {
+        console.log(d)
+        if(GLOBAL_IsReverseEdge)
+        {
+          reverseEdgesBetween(d.source.id, d.target.id);
+          updateGraph();
+          GLOBAL_IsReverseEdge = false;
+        }
+      })
+      .attr("stroke", function(d){
+        if(d.value<0)
+          return 'red'
+        else
+          return 'green'})
+
+      .attr("stroke-width", function(d) { return Math.abs(d.value)*10; })
+      .attr("fill", "none")
+      .attr("marker-end","url(#arrow)")
+
+      ;
+
+
+
+  var node = svg.append("g")
+      .attr("class", "nodes")
+    .selectAll("g")
+    .data(simulation
+      .nodes())
+    .enter().append("g")
+    
+  var circles = node.append("circle")
+      .attr("r", 7)
+      .attr("fill", function(d) { return color(d.group); })
+      .on("mouseover", function(d) {selectedNodeString = d.id;
+                                    document.getElementById("searchString").innerHTML = selectedNodeString;
+                                      })
+      .call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended));
+
+
+
+  var lables = node.append("text")
+      .text(function(d) {
+        return d.id;
+      })
+      .attr('x', 6)
+      .attr('y', 3);
+
+  node.append("title")
+      .text(function(d) { return d.id; });
+
+  simulation
+      .nodes(simulation
+      .nodes())
+      .on("tick", function(){
+        plink.attr("d", function(d){
+        var dx = d.target.x - d.source.x,
+            dy = d.target.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+        // return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+        return "M" + d.source.x + "," + d.source.y + "L" +  d.target.x + "," + d.target.y;
+      });
+      plink.attr("d", function(d) {
+        var pl = this.getTotalLength(),
+          r = 5 + 16.97, //16.97 is the "size" of the marker Math.sqrt(12**2 + 12 **2)
+          m = this.getPointAtLength(pl - r);
+
+         var dx = m.x - d.source.x,
+            dy = m.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+
+            //STRAIGHT LINE
+          return "M" + d.source.x + "," + d.source.y + "L" +  m.x + "," + m.y;
+      });
+
+    node.attr("transform", function(d) {
+          return "translate(" + d.x + "," + d.y + ")";
+        })
+      });
+
+  simulation.force("link")
+      .links(simulation.force("link")
+      .links());
+
+  svg.append('marker')
+    .attr('id', 'arrow')
+    .attr('markerUnits', "userSpaceOnUse")
+    //BOX??
+    .attr('viewBox', [0, -5, 10, 10])
+    .attr('refX', "0")
+    .attr('refY', "0")      
+    .attr('markerWidth', 12)
+    .attr('markerHeight', 12)
+    .attr('orient', 'auto')
+    .append('path')
+    // .attr('d', d3.line()(arrowPoints))
+    //MARKER SHAPE
+    .attr('d', "M0,-5L10,0L0,5")
+    // .attr('stroke', 'black');
+}
+
+  function ticked() {
+    // link
+    //     .attr("x1", function(d) { return d.source.x; })
+    //     .attr("y1", function(d) { return d.source.y; })
+    //     .attr("x2", function(d) { return d.target.x+3; })
+    //     .attr("y2", function(d) { return d.target.y+10; });
+    //     // .attr("marker-end","url(#arrow)");
+
+     plink.attr("d", function(d){
+        var dx = d.target.x - d.source.x,
+            dy = d.target.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+        // return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+        return "M" + d.source.x + "," + d.source.y + "L" +  d.target.x + "," + d.target.y;
+      });
+      plink.attr("d", function(d) {
+        var pl = this.getTotalLength(),
+          r = 5 + 16.97, //16.97 is the "size" of the marker Math.sqrt(12**2 + 12 **2)
+          m = this.getPointAtLength(pl - r);
+
+         var dx = m.x - d.source.x,
+            dy = m.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+
+            //STRAIGHT LINE
+          return "M" + d.source.x + "," + d.source.y + "L" +  m.x + "," + m.y;
+      });
+
+    node.attr("transform", function(d) {
+          return "translate(" + d.x + "," + d.y + ")";
+        })
+  }
+
+
+function dragstarted(d) {
+  if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+
+  //Checking if the code is in node addition mode
+  if(GLOBAL_IsNewAddition)
+  {
+
+    //Adding an edge from the 'clicked-on' node to the newly added node
+    addEdge(d, GLOBAL_newNode);
+
+    //Resetting the mode
+    GLOBAL_IsNewAddition = false;
+  }
+}
+
+function dragged(d) {
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragended(d) {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+function addOption(item)
+{
+  if(item.length > 4)
+  {
+    var dropdown = document.getElementById("datasetsdropdown");
+    var option = document.createElement("option");
+    option.text = item;
+    dropdown.add(option);
+  }
+  
+}
+
+
+function dropdownChangeOperation()
+{
+  var dropdown = document.getElementById("datasetsdropdown");
+  var selectedDataset = dropdown.options[dropdown.selectedIndex].text;
+  $.ajax({
+      type: 'GET',
+      url: "/downloadDataset/" + selectedDataset,
+      contentType: 'application/json; charset=utf-8',
+      success: function(result) {
+            // alert(result);
+               
+      }
+    });
+  // alert(selectedDataset);
+}
+
+function addEdge(source, destination)
+{
+    var newEdge = {source: source, target: destination, value:0.4359};
+    simulation.force("link")
+      .links().push(newEdge);
+    updateGraph();
+
+}
+function addNode(nodeName='new node'){
+
+  var newNode = {id: nodeName, group: 1}
+  simulation
+      .nodes().push(newNode);
+  GLOBAL_newNode = newNode;
+  GLOBAL_IsNewAddition = true;
+  updateGraph();
+}
+
+function toggleReverseEdge()
+{
+  GLOBAL_IsReverseEdge = true;
+}
+
+function reverseEdgesBetween(source, destination)
+{
+    console.log("HELLO")
+    simulation.force("link").links()
+    for(i = 0; i < simulation.force("link").links().length; i++)
+    {
+      // console.log("i" + simulation.force("link").links()[i].destination)
+      var x = simulation.force("link").links()[i];
+      if((x.source.id == source
+        && x.target.id == destination))
+      {
+        // var newEdge = {source: destination2, target: source2, value:0.4359};
+        var temp = simulation.force("link").links()[i].source;
+        simulation.force("link").links()[i].source = simulation.force("link").links()[i].target;
+        simulation.force("link").links()[i].target = temp;
+
+        // simulation.force("link").links().push(newEdge);
+        break;
+      }
+      
+    }
+}
+
+function useSearchString()
+{
+    $.ajax({
+      type: 'GET',
+      url: "/getDatasetList/" + selectedNodeString,
+      contentType: 'application/json; charset=utf-8',
+      success: function(result) {
+            // alert(result);
+            datasets = result.split('"');
+            datasets.forEach(addOption);    
+      }
+    });
+    // datasets.forEach(addOption);
+    // datasets = {{data.datasets | safe}};
+}
+
+
+//HEATMAP CODE
+var threshold = 0.5
+var topAttributes = new Set();
+for(i = 0; i < matrix.length; i++)
+{
+  for(j = 0; j < matrix.length; j++)
+  {
+    if((Math.abs(matrix[i][j]) > threshold) && (i!=j))
+    {
+      topAttributes.add(nodeinput[i]);
+      topAttributes.add(nodeinput[j]);
+    }
+  }
+}
+
+
+// set the dimensions and margins of the graph
+var margin = {top: 30, right: 30, bottom: 200, left: 200},
+  width = 450 - margin.left - margin.right,
+  height = 450 - margin.top - margin.bottom;
+
+// append the svg object to the body of the page
+var svg = d3.select("#svg2")
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", height + margin.top + margin.bottom)
+.append("g")
+  .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
+
+
+var matrix2 = []
+b =[]
+for (i=0; i< matrix.length; i++){
+  b.push(50);
+}
+
+for (i=0; i< matrix.length; i++){
+  matrix2.push(b);
+}
+
+
+// Build X scales and axis:
+var x = d3.scaleBand()
+  .range([ 0, width ])
+  .domain(nodeinput)
+  .padding(0.01);
+svg.append("g")
+  .attr("transform", "translate(0," + height + ")")
+  .call(d3.axisBottom(x))
+    .selectAll("text")  
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em")
+            .attr("transform", function(d) {
+                return "rotate(-90)" 
+                }
+
+    );
+
+// Build X scales and axis:
+var y = d3.scaleBand()
+  .range([ height, 0 ])
+  .domain(nodeinput.reverse())
+  .padding(0.01);
+svg.append("g")
+  .call(d3.axisLeft(y));
+
+// Build color scale
+var positiveColor = d3.scaleLinear()
+  .range(["white", "#69b3a2"])
+  .domain([1,100])
+
+var negativeColor = d3.scaleLinear()
+  .range(["white", "#d13f26"])
+  .domain([1,100])
+
+var values = topAttributes.values();
+var topString = ""
+ for(i = 0; i < topAttributes.size; i++)
+ {
+    topString = topString + values.next().value
+    if(i != topAttributes.size-1)
+    {
+      topString = topString + ", "
+    }
+ }
+
+svg.append("text")
+         .attr("x", -110)
+         .attr("y", height+ 120)
+         // .style("text-decoration", "underline") 
+         .text("Interesting variables:");
+
+      svg.append("text")
+         .attr("x", -110)
+         .attr("y", height+ 140)
+         // .style("text-decoration", "underline") 
+         .text(topString);
+
+var i;
+var j;
+for(i = 0; i < matrix.length; i++)
+{
+  for(j = 0; j < matrix.length; j++)
+  {
+    svg.selectAll()
+      .data(matrix2, function(d) {return nodeinput[i]+':'+nodeinput[j];})
+      .enter()
+      .append("rect")
+      .attr("x", function(d) { return x(nodeinput[i]) })
+      .attr("y", function(d) { return y(nodeinput[matrix.length-j-1]) })
+      .attr("width", x.bandwidth() )
+      .attr("height", y.bandwidth() )
+      .style("fill", function(d) { 
+        if((matrix[matrix.length-1-i][j]) > 0)
+          return positiveColor((matrix[matrix.length-1-i][j])*100)
+        else if((matrix[matrix.length-1-i][j]) < 0)
+          return negativeColor(Math.abs(matrix[matrix.length-1-i][j])*700)
+
+      } )    
+  }
+}
+</script>
